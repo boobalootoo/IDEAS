@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Climbing Route Analyzer</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #1a202c;
+            color: #e2e8f0;
+        }
+        .container {
+            max-width: 1200px;
+        }
+        canvas {
+            background-color: #2d3748;
+            border-radius: 0.5rem;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1), 0 1px 3px rgba(0, 0, 0, 0.08);
+            cursor: crosshair;
+        }
+        input[type="color"]::-webkit-color-swatch-wrapper {
+            padding: 0;
+        }
+        input[type="color"]::-webkit-color-swatch {
+            border: none;
+            border-radius: 0.25rem;
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8 flex flex-col items-center min-h-screen">
+    <div class="container mx-auto">
+        <h1 class="text-4xl md:text-5xl font-extrabold text-center text-teal-300 mb-6">Climbing Route Analyzer</h1>
+        <p class="text-center text-gray-400 mb-8">Upload a picture of a climbing wall, detect holds, and get personalized route recommendations.</p>
+
+        <!-- User Stats Section -->
+        <div class="bg-gray-800 p-6 rounded-xl shadow-lg mb-8">
+            <h2 class="text-2xl font-semibold text-teal-300 mb-4">Your Stats</h2>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                    <label for="height" class="block text-sm font-medium text-gray-400">Height (cm)</label>
+                    <input type="number" id="height" class="mt-1 block w-full rounded-md bg-gray-700 text-white border-transparent focus:ring-teal-500 focus:border-teal-500 transition duration-150 ease-in-out p-2">
+                </div>
+                <div>
+                    <label for="armLength" class="block text-sm font-medium text-gray-400">Arm Length (cm)</label>
+                    <input type="number" id="armLength" class="mt-1 block w-full rounded-md bg-gray-700 text-white border-transparent focus:ring-teal-500 focus:border-teal-500 transition duration-150 ease-in-out p-2">
+                </div>
+                <div>
+                    <label for="legLength" class="block text-sm font-medium text-gray-400">Leg Length (cm)</label>
+                    <input type="number" id="legLength" class="mt-1 block w-full rounded-md bg-gray-700 text-white border-transparent focus:ring-teal-500 focus:border-teal-500 transition duration-150 ease-in-out p-2">
+                </div>
+            </div>
+            <p class="text-sm text-gray-500 mt-2">Your stats are automatically saved and loaded between sessions.</p>
+        </div>
+
+        <div class="flex flex-col md:flex-row gap-8">
+            <!-- Controls Section -->
+            <div class="md:w-1/3 w-full bg-gray-800 p-6 rounded-xl shadow-lg flex flex-col h-fit">
+                <h2 class="text-2xl font-semibold text-teal-300 mb-4">Controls</h2>
+                <div class="mb-4">
+                    <label for="imageUpload" class="block text-sm font-medium text-gray-400">Upload Climbing Wall Image</label>
+                    <input type="file" id="imageUpload" accept="image/*" class="mt-1 block w-full text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-teal-500 file:text-white hover:file:bg-teal-600 transition duration-150 ease-in-out">
+                </div>
+                <div class="mb-4 flex items-center gap-4">
+                    <label for="holdColor" class="block text-sm font-medium text-gray-400">Route Hold Color</label>
+                    <input type="color" id="holdColor" value="#ffffff" class="w-12 h-8 rounded-md cursor-pointer">
+                </div>
+                <div class="flex flex-col space-y-4">
+                    <button id="detectButton" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-6 rounded-xl shadow-lg transition duration-300 ease-in-out">
+                        Detect Holds
+                    </button>
+                    <button id="recommendButton" class="bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-6 rounded-xl shadow-lg transition duration-300 ease-in-out" disabled>
+                        Get Recommended Route
+                    </button>
+                    <button id="plotButton" class="bg-purple-500 hover:bg-purple-600 text-white font-bold py-3 px-6 rounded-xl shadow-lg transition duration-300 ease-in-out" disabled>
+                        Plot Your Own Route
+                    </button>
+                </div>
+                <p id="plotInstructions" class="text-sm text-gray-500 italic mt-4 text-center hidden">Click on holds in the image to plot your route. Click a hold again to deselect it.</p>
+            </div>
+
+            <!-- Canvas and Results Section -->
+            <div class="md:w-2/3 w-full relative">
+                <div id="loading" class="absolute inset-0 flex items-center justify-center bg-gray-900 bg-opacity-75 rounded-xl z-10 hidden">
+                    <div class="flex items-center space-x-2 text-white">
+                        <svg class="animate-spin h-8 w-8 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        <span id="loading-text">Analyzing image...</span>
+                    </div>
+                </div>
+                <canvas id="climbingCanvas" class="w-full"></canvas>
+                <div id="results" class="bg-gray-800 p-6 rounded-xl shadow-lg mt-8 hidden">
+                    <h2 class="text-xl font-semibold text-teal-300 mb-2">Route Details</h2>
+                    <div id="routeDetails" class="text-gray-300 text-lg"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        setLogLevel('debug');
+
+        const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+        let userId = null;
+
+        const canvas = document.getElementById('climbingCanvas');
+        const ctx = canvas.getContext('2d');
+        const imageUpload = document.getElementById('imageUpload');
+        const holdColorInput = document.getElementById('holdColor');
+        const detectButton = document.getElementById('detectButton');
+        const recommendButton = document.getElementById('recommendButton');
+        const plotButton = document.getElementById('plotButton');
+        const loadingDiv = document.getElementById('loading');
+        const loadingText = document.getElementById('loading-text');
+        const resultsDiv = document.getElementById('results');
+        const routeDetailsDiv = document.getElementById('routeDetails');
+        const heightInput = document.getElementById('height');
+        const armLengthInput = document.getElementById('armLength');
+        const legLengthInput = document.getElementById('legLength');
+        const plotInstructions = document.getElementById('plotInstructions');
+
+        let originalImage = null;
+        let detectedHolds = [];
+        let plottedRoute = [];
+        let plottingMode = false;
+
+        const USER_STATS_COLLECTION = `artifacts/${appId}/users`;
+        const USER_STATS_DOC = 'user_stats';
+
+        // Custom modal for user messages instead of alert()
+        function showMessage(message) {
+            const modal = document.createElement('div');
+            modal.className = 'fixed inset-0 bg-gray-900 bg-opacity-75 z-50 flex items-center justify-center';
+            modal.innerHTML = `
+                <div class="bg-gray-800 p-6 rounded-lg shadow-lg max-w-sm w-full text-center">
+                    <p class="text-white mb-4">${message}</p>
+                    <button class="bg-teal-500 hover:bg-teal-600 text-white font-bold py-2 px-4 rounded-md" onclick="this.closest('.fixed').remove()">OK</button>
+                </div>
+            `;
+            document.body.appendChild(modal);
+        }
+
+        // Firebase Auth State Listener
+        onAuthStateChanged(auth, async (user) => {
+            if (user) {
+                userId = user.uid;
+                await loadUserStats();
+                console.log("Firebase initialized for user:", userId);
+            } else {
+                try {
+                    if (initialAuthToken) {
+                        await signInWithCustomToken(auth, initialAuthToken);
+                    } else {
+                        await signInAnonymously(auth);
+                    }
+                } catch (error) {
+                    console.error("Firebase Auth Error:", error);
+                    showMessage("Failed to authenticate. Please try again.");
+                }
+            }
+        });
+
+        // Firestore functions
+        async function loadUserStats() {
+            if (!userId) return;
+            try {
+                const docRef = doc(db, `${USER_STATS_COLLECTION}/${userId}/private/${USER_STATS_DOC}`);
+                const docSnap = await getDoc(docRef);
+                if (docSnap.exists()) {
+                    const data = docSnap.data();
+                    heightInput.value = data.height || '';
+                    armLengthInput.value = data.armLength || '';
+                    legLengthInput.value = data.legLength || '';
+                    console.log("User stats loaded from Firestore.");
+                }
+            } catch (e) {
+                console.error("Error loading user stats:", e);
+            }
+        }
+
+        async function saveUserStats() {
+            if (!userId) return;
+            try {
+                const docRef = doc(db, `${USER_STATS_COLLECTION}/${userId}/private/${USER_STATS_DOC}`);
+                await setDoc(docRef, {
+                    height: heightInput.value,
+                    armLength: armLengthInput.value,
+                    legLength: legLengthInput.value,
+                });
+                console.log("User stats saved to Firestore.");
+            } catch (e) {
+                console.error("Error saving user stats:", e);
+            }
+        }
+
+        // Input change listeners to save stats automatically
+        heightInput.addEventListener('change', saveUserStats);
+        armLengthInput.addEventListener('change', saveUserStats);
+        legLengthInput.addEventListener('change', saveUserStats);
+
+        // Canvas drawing functions
+        function resizeCanvas() {
+            const container = canvas.parentElement;
+            canvas.width = container.clientWidth;
+            canvas.height = originalImage ? originalImage.height * (canvas.width / originalImage.width) : container.clientWidth * (2/3);
+        }
+
+        function redrawCanvas() {
+            if (!originalImage) return;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(originalImage, 0, 0, canvas.width, canvas.height);
+
+            // Draw detected holds
+            detectedHolds.forEach(hold => {
+                ctx.beginPath();
+                ctx.arc(hold.x, hold.y, 8, 0, 2 * Math.PI);
+                ctx.fillStyle = hold.color;
+                ctx.fill();
+                ctx.strokeStyle = '#fff';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+            });
+
+            // Draw plotted route
+            if (plottedRoute.length > 1) {
+                ctx.beginPath();
+                ctx.strokeStyle = 'cyan';
+                ctx.lineWidth = 3;
+                ctx.moveTo(plottedRoute[0].x, plottedRoute[0].y);
+                plottedRoute.slice(1).forEach(hold => {
+                    ctx.lineTo(hold.x, hold.y);
+                });
+                ctx.stroke();
+            }
+        }
+
+        window.addEventListener('resize', () => {
+            resizeCanvas();
+            redrawCanvas();
+        });
+
+        // Image upload handling
+        imageUpload.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    originalImage = new Image();
+                    originalImage.onload = () => {
+                        resizeCanvas();
+                        redrawCanvas();
+                        detectButton.disabled = false;
+                        plottedRoute = [];
+                        resultsDiv.classList.add('hidden');
+                        plotInstructions.classList.add('hidden');
+                        recommendButton.disabled = true;
+                        plotButton.disabled = false;
+                    };
+                    originalImage.src = e.target.result;
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+
+        // Exponential backoff for API calls
+        async function callWithBackoff(func, maxRetries = 5) {
+            for (let i = 0; i < maxRetries; i++) {
+                try {
+                    return await func();
+                } catch (error) {
+                    if (error.status === 429 && i < maxRetries - 1) {
+                        const delay = Math.pow(2, i) * 1000 + Math.random() * 1000;
+                        console.warn(`Rate limit exceeded. Retrying in ${delay / 1000}s...`);
+                        await new Promise(res => setTimeout(res, delay));
+                    } else {
+                        throw error;
+                    }
+                }
+            }
+        }
+
+        // LLM interaction for Hold Detection
+        detectButton.addEventListener('click', async () => {
+            if (!originalImage) {
+                showMessage("Please upload an image first.");
+                return;
+            }
+
+            loadingDiv.classList.remove('hidden');
+            loadingText.textContent = "Analyzing image and detecting holds...";
+
+            try {
+                const base64Image = originalImage.src.split(',')[1];
+                const selectedColor = holdColorInput.value;
+
+                const systemPrompt = `You are a world-class rock climbing route analyst. Your task is to identify and analyze climbing holds of a specific color from an image.
+                Identify all holds that match the specified color. For each identified hold, estimate its pixel coordinates (x, y) on the wall relative to the top-left corner, and classify its type (e.g., Jug, Crimp, Sloper, Pinch, Pocket, Foot Hold).
+                Provide your response as a JSON array of objects, where each object has 'x', 'y', 'type', and 'color' properties. The 'x' and 'y' coordinates should be integers. The 'color' property should be the hex code provided by the user.
+                Example JSON format: [{"x": 120, "y": 300, "type": "Jug", "color": "#ff0000"}, {"x": 450, "y": 510, "type": "Crimp", "color": "#ff0000"}]`;
+
+                const userQuery = `Analyze the climbing wall image and find all holds of the color "${selectedColor}".`;
+                const payload = {
+                    contents: [{
+                        role: "user",
+                        parts: [
+                            { text: userQuery },
+                            { inlineData: { mimeType: "image/jpeg", data: base64Image } }
+                        ]
+                    }],
+                    generationConfig: {
+                        responseMimeType: "application/json",
+                    },
+                    model: "gemini-2.5-flash-preview-05-20"
+                };
+
+                const apiKey = "";
+                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
+
+                const response = await callWithBackoff(() => fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                }));
+                const result = await response.json();
+
+                if (result.candidates && result.candidates.length > 0 && result.candidates[0].content && result.candidates[0].content.parts && result.candidates[0].content.parts.length > 0) {
+                    const jsonString = result.candidates[0].content.parts[0].text;
+                    detectedHolds = JSON.parse(jsonString);
+                    console.log("Detected Holds:", detectedHolds);
+
+                    // Scale coordinates to canvas size
+                    const scaleX = canvas.width / originalImage.width;
+                    const scaleY = canvas.height / originalImage.height;
+                    detectedHolds = detectedHolds.map(hold => ({
+                        ...hold,
+                        x: hold.x * scaleX,
+                        y: hold.y * scaleY
+                    }));
+                    redrawCanvas();
+                    recommendButton.disabled = false;
+                    plotButton.disabled = false;
+                } else {
+                    showMessage("Could not detect any holds. Please try a different color or a clearer image.");
+                    console.error("LLM response was empty or malformed.");
+                }
+            } catch (error) {
+                console.error("Error during hold detection:", error);
+                showMessage(`Error detecting holds: ${error.message}`);
+            } finally {
+                loadingDiv.classList.add('hidden');
+            }
+        });
+
+        // LLM interaction for Route Recommendation
+        recommendButton.addEventListener('click', async () => {
+            if (detectedHolds.length === 0) {
+                showMessage("Please detect holds first.");
+                return;
+            }
+
+            loadingDiv.classList.remove('hidden');
+            loadingText.textContent = "Calculating best route...";
+
+            try {
+                const height = heightInput.value || 175; // Default to 175 cm
+                const armLength = armLengthInput.value || 70; // Default to 70 cm
+                const legLength = legLengthInput.value || 90; // Default to 90 cm
+
+                const systemPrompt = `You are an expert climbing coach. Based on the user's physical stats and the list of available climbing holds, create a detailed, step-by-step route recommendation. The route should be logical, challenging but achievable. Describe the moves, the grip type to use on each hold, and the sequence. The output should be a single, structured text response.`;
+                const userQuery = `My stats are: height ${height}cm, arm length ${armLength}cm, leg length ${legLength}cm. Here are the detected holds with their approximate pixel coordinates and types: ${JSON.stringify(detectedHolds)}. Please recommend a logical climbing route.`;
+
+                const payload = {
+                    contents: [{
+                        role: "user",
+                        parts: [{ text: userQuery }]
+                    }],
+                    systemInstruction: {
+                        parts: [{ text: systemPrompt }]
+                    },
+                    model: "gemini-2.5-flash-preview-05-20"
+                };
+
+                const apiKey = "";
+                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
+
+                const response = await callWithBackoff(() => fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                }));
+                const result = await response.json();
+
+                if (result.candidates && result.candidates.length > 0 && result.candidates[0].content && result.candidates[0].content.parts && result.candidates[0].content.parts.length > 0) {
+                    const routeText = result.candidates[0].content.parts[0].text;
+                    routeDetailsDiv.innerHTML = routeText.replace(/\n/g, '<br>');
+                    resultsDiv.classList.remove('hidden');
+                    plottedRoute = []; // Reset plotted route when new route is recommended
+                    redrawCanvas();
+                } else {
+                    showMessage("Could not generate a route. The model may have had an issue.");
+                    console.error("LLM response was empty or malformed.");
+                }
+            } catch (error) {
+                console.error("Error during route recommendation:", error);
+                showMessage(`Error generating route: ${error.message}`);
+            } finally {
+                loadingDiv.classList.add('hidden');
+            }
+        });
+
+        // Plot Your Own route
+        plotButton.addEventListener('click', () => {
+            plottingMode = !plottingMode;
+            plotButton.textContent = plottingMode ? "End Plotting" : "Plot Your Own Route";
+            plotInstructions.classList.toggle('hidden', !plottingMode);
+            plottedRoute = [];
+            redrawCanvas();
+        });
+
+        canvas.addEventListener('click', (e) => {
+            if (!plottingMode) return;
+
+            const rect = canvas.getBoundingClientRect();
+            const clickX = e.clientX - rect.left;
+            const clickY = e.clientY - rect.top;
+
+            // Find the closest hold
+            const closestHold = detectedHolds.reduce((closest, current) => {
+                const dist1 = Math.sqrt(Math.pow(clickX - closest.x, 2) + Math.pow(clickY - closest.y, 2));
+                const dist2 = Math.sqrt(Math.pow(clickX - current.x, 2) + Math.pow(clickY - current.y, 2));
+                return dist2 < dist1 ? current : closest;
+            }, detectedHolds[0]);
+
+            if (closestHold && Math.sqrt(Math.pow(clickX - closestHold.x, 2) + Math.pow(clickY - closestHold.y, 2)) < 20) {
+                const index = plottedRoute.findIndex(h => h.x === closestHold.x && h.y === closestHold.y);
+                if (index > -1) {
+                    plottedRoute.splice(index, 1);
+                } else {
+                    plottedRoute.push(closestHold);
+                }
+                redrawCanvas();
+            }
+        });
+
+    </script>
+</body>
+</html>
