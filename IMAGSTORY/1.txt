@@ -1,0 +1,1 @@
+make me a html site that you upload an image to and it searches some open source archive of historical images and finds the most similar one. it should include a mode where you can choose an image and overlay it onto a camerafeed so you can recreate it
