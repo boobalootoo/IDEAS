@@ -1,0 +1,4 @@
+make a html site where i can upload a picture of a climbing wall and specifiy the colour I'm doing it should automatically detect which holds and types these are (with the option to adjust if it is not accurate) , it could also take into account what moves you do on what types of holds. you should upload stats like your height and arm and leg length (this info should be remembered between session). there should be options to receive a reccomended route or plot your own.
+
+
+
